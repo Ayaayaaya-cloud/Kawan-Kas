@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Kawan Kas - Keuangan Internal</title>
+<meta name="theme-color" content="#0B2A23">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kawan Kas">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================== KONFIGURASI (WAJIB DIISI) =====================
+     Ganti nilai di bawah ini setelah setup Google Sheet + Apps Script
+     selesai. Panduan lengkap ada di README.md
+====================================================================== -->
+<script>
+  window.KAWANKAS_CONFIG = {
+    API_URL: 'https://script.google.com/macros/s/AKfycbzSeK8IS8vGaicPJ7_DyZ4aE8z_fegGh2SnTzJLwSpqGg4Sv8lyhDTkAAg9j6LPibM3/exec', // diakhiri /exec
+  };
+</script>
+
+<!-- ===================== LOGIN SCREEN ===================== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <img src="icons/icon-192.png" class="login-logo" alt="Kawan Kas">
+    <h1>Kawan Kas</h1>
+    <p class="login-sub">Pembukuan keuangan internal. Masuk dengan akun yang sudah didaftarkan admin.</p>
+
+    <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+      <div class="field" style="text-align:left;">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="nama@email.com" required autocomplete="username">
+      </div>
+      <div class="field" style="text-align:left;">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-submit" style="margin-top:4px;">Masuk</button>
+    </form>
+
+    <div id="loginSpinner" class="login-spinner" style="display:none;">
+      <div class="spinner"></div> Memeriksa akun...
+    </div>
+    <p id="loginError" class="login-error" style="display:none;"></p>
+    <p class="login-note">Lupa password atau belum terdaftar? Hubungi admin.</p>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+
+  <!-- ===================== TOP BAR (Dashboard only) ===================== -->
+  <div class="topbar" id="topbar">
+    <div class="topbar-row">
+      <span class="topbar-brand">KAWAN KAS</span>
+      <span id="todayDate"></span>
+    </div>
+    <div class="balance-label">Saldo saat ini</div>
+    <div class="balance-value" id="balanceValue">Rp 0</div>
+    <div class="balance-sub">
+      <div class="balance-chip"><span class="dot dot-in"></span> Masuk: <span id="totalIn">Rp 0</span></div>
+      <div class="balance-chip"><span class="dot dot-out"></span> Keluar: <span id="totalOut">Rp 0</span></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===================== SCREEN: DASHBOARD ===================== -->
+    <section class="screen active" id="screen-dashboard">
+      <div class="quick-actions">
+        <button class="qa-btn primary" onclick="goToScreen('scan')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2M20 7V5a2 2 0 0 0-2-2h-2M20 17v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="4"/></svg>
+          Scan Struk
+        </button>
+        <button class="qa-btn" onclick="goToScreen('input')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Tambah Transaksi
+        </button>
+      </div>
+
+      <div class="section-title">Transaksi Terbaru <small onclick="goToScreen('riwayat')" style="cursor:pointer;">Lihat semua ›</small></div>
+      <div id="recentTxList"></div>
+    </section>
+
+    <!-- ===================== SCREEN: INPUT MANUAL ===================== -->
+    <section class="screen" id="screen-input">
+      <div class="section-title">Tambah Transaksi Manual</div>
+      <div class="form-card">
+        <div class="field">
+          <label>Jenis Transaksi</label>
+          <div class="type-toggle">
+            <button type="button" id="typeInBtn" class="active in" onclick="setTxType('masuk')">↓ Pemasukan</button>
+            <button type="button" id="typeOutBtn" class="out" onclick="setTxType('keluar')">↑ Pengeluaran</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tanggal</label>
+          <input type="date" id="inputTanggal">
+        </div>
+        <div class="field">
+          <label>Nominal (Rp)</label>
+          <input type="number" id="inputNominal" placeholder="Contoh: 150000" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Kategori</label>
+          <select id="inputKategori">
+            <option value="Operasional">Operasional</option>
+            <option value="Konsumsi">Konsumsi</option>
+            <option value="Transportasi">Transportasi</option>
+            <option value="Peralatan">Peralatan / ATK</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Gaji">Gaji / Honor</option>
+            <option value="Donasi">Donasi / Zakat</option>
+            <option value="Pendapatan">Pendapatan Usaha</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Deskripsi</label>
+          <input type="text" id="inputDeskripsi" placeholder="Contoh: Beli ATK di Indomaret">
+        </div>
+        <input type="hidden" id="inputReceiptImage">
+        <input type="hidden" id="inputDriveLink">
+        <div id="manualReceiptPreviewWrap"></div>
+        <button class="btn-submit" onclick="submitManualTransaction()">Simpan Transaksi</button>
+        <button class="btn-secondary" onclick="goToScreen('dashboard')">Batal</button>
+      </div>
+    </section>
+
+    <!-- ===================== SCREEN: SCAN STRUK ===================== -->
+    <section class="screen" id="screen-scan">
+      <div class="section-title">Scan Struk Otomatis</div>
+      <div class="scan-box" id="scanBoxInitial">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2M20 7V5a2 2 0 0 0-2-2h-2M20 17v2a2 2 0 0 1-2 2h-2"/><circle cx="12" cy="12" r="4"/></svg>
+        <p>Ambil foto struk belanja. Sistem akan otomatis membaca nominal, tanggal, dan nama toko.</p>
+        <label class="scan-input-label">
+          📷 Ambil Foto Struk
+          <input type="file" id="receiptCameraInput" accept="image/*" capture="environment" style="display:none;">
+        </label>
+      </div>
+
+      <div id="scanResultArea" style="display:none;">
+        <img id="receiptPreviewImg" class="receipt-preview" alt="Preview struk">
+        <div class="ocr-status" id="ocrStatus" style="display:none;">
+          <div class="spinner"></div>
+          <span id="ocrStatusText">Membaca struk dengan OCR...</span>
+        </div>
+
+        <div class="form-card">
+          <div class="field">
+            <label>Jenis Transaksi</label>
+            <div class="type-toggle">
+              <button type="button" id="scanTypeInBtn" class="in" onclick="setScanTxType('masuk')">↓ Pemasukan</button>
+              <button type="button" id="scanTypeOutBtn" class="active out" onclick="setScanTxType('keluar')">↑ Pengeluaran</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Tanggal (hasil deteksi, bisa diedit)</label>
+            <input type="date" id="scanTanggal">
+          </div>
+          <div class="field">
+            <label>Nominal (hasil deteksi, bisa diedit)</label>
+            <input type="number" id="scanNominal" placeholder="0" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label>Kategori (auto-detect, bisa diedit)</label>
+            <select id="scanKategori">
+              <option value="Operasional">Operasional</option>
+              <option value="Konsumsi">Konsumsi</option>
+              <option value="Transportasi">Transportasi</option>
+              <option value="Peralatan">Peralatan / ATK</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Gaji">Gaji / Honor</option>
+              <option value="Donasi">Donasi / Zakat</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Nama Toko / Deskripsi</label>
+            <input type="text" id="scanDeskripsi" placeholder="Nama toko">
+          </div>
+          <div class="field">
+            <label>Teks Hasil OCR (mentah)</label>
+            <textarea id="scanRawText" rows="3" readonly style="font-size:0.72rem; color:#5B6B65;"></textarea>
+          </div>
+          <input type="hidden" id="scanDriveLink">
+          <button class="btn-submit" onclick="submitScanTransaction()">Simpan Transaksi</button>
+          <button class="btn-secondary" onclick="resetScanScreen()">Scan Ulang</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SCREEN: RIWAYAT ===================== -->
+    <section class="screen" id="screen-riwayat">
+      <div class="section-title">Riwayat Transaksi</div>
+      <div class="filter-row" id="filterRow">
+        <div class="filter-chip active" data-filter="semua" onclick="setFilter('semua')">Semua</div>
+        <div class="filter-chip" data-filter="masuk" onclick="setFilter('masuk')">Pemasukan</div>
+        <div class="filter-chip" data-filter="keluar" onclick="setFilter('keluar')">Pengeluaran</div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card in"><div class="label">Total Masuk</div><div class="value" id="riwayatTotalIn">Rp 0</div></div>
+        <div class="summary-card out"><div class="label">Total Keluar</div><div class="value" id="riwayatTotalOut">Rp 0</div></div>
+      </div>
+      <div class="section-title" style="margin-top:18px;">Daftar Transaksi</div>
+      <div id="fullTxList"></div>
+    </section>
+
+    <!-- ===================== SCREEN: SETTINGS ===================== -->
+    <section class="screen" id="screen-settings">
+      <div class="section-title">Pengaturan</div>
+      <div class="form-card">
+        <div class="field">
+          <label>Masuk sebagai</label>
+          <div id="currentUserInfo" style="font-size:0.9rem; font-weight:700;"></div>
+        </div>
+        <button class="btn-secondary" style="color:#C1462C;" onclick="logoutUser()">🚪 Keluar (Logout)</button>
+      </div>
+
+      <div class="form-card" style="margin-top:14px;">
+        <div class="field" style="margin-bottom:8px;">
+          <label>Sinkronisasi Data</label>
+        </div>
+        <button class="btn-secondary" onclick="manualRefresh()">🔄 Refresh Data dari Spreadsheet</button>
+        <p class="settings-note">
+          Semua transaksi tersimpan langsung di Google Spreadsheet tim dan bisa diakses dari
+          perangkat manapun oleh user yang terdaftar. Data ikut ter-refresh otomatis setiap
+          beberapa detik saat halaman Dashboard / Riwayat dibuka.
+        </p>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ===================== BOTTOM NAV ===================== -->
+  <div class="bottom-nav">
+    <button class="nav-btn active" data-nav="dashboard" onclick="goToScreen('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-btn" data-nav="riwayat" onclick="goToScreen('riwayat')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      Riwayat
+    </button>
+    <button class="nav-btn scan-fab" data-nav="scan" onclick="goToScreen('scan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M4 7V5a2 2 0 0 1 2-2h2M4 17v2a2 2 0 0 0 2 2h2M20 7V5a2 2 0 0 0-2-2h-2M20 17v2a2 2 0 0 1-2 2h-2"/></svg>
+    </button>
+    <button class="nav-btn" data-nav="input" onclick="goToScreen('input')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Tambah
+    </button>
+    <button class="nav-btn" data-nav="settings" onclick="goToScreen('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Setelan
+    </button>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
