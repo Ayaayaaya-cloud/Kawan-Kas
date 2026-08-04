@@ -135,6 +135,26 @@ html, body {
   color: var(--emerald-950);
 }
 .qa-btn svg { width: 26px; height: 26px; }
+.qa-btn-wide {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--emerald-950);
+  color: var(--gold-400);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  z-index: 2;
+}
+.qa-btn-wide svg { width: 18px; height: 18px; }
 
 /* Transaction list */
 .tx-item {

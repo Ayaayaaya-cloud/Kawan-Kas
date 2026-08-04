@@ -10,6 +10,7 @@ const API_URL = CONFIG.API_URL;
 
 const SESSION_TOKEN_KEY = 'kawankas_session_token';
 const SESSION_USER_KEY = 'kawankas_session_user';
+const SESSION_REPORT_URL_KEY = 'kawankas_report_url';
 const CACHE_TX_KEY = 'kawankas_cache_transactions'; // fallback tampilan cepat / offline-read
 
 const POLL_INTERVAL_MS = 20000; // refresh data tiap 20 detik saat app aktif
@@ -107,6 +108,7 @@ function initApp() {
         clearSession();
         showLoginScreen();
       } else {
+        if (res.reportUrl) localStorage.setItem(SESSION_REPORT_URL_KEY, res.reportUrl);
         refreshTransactions();
         startPolling();
       }
@@ -132,6 +134,7 @@ function handleLoginSubmit(e) {
     }
     localStorage.setItem(SESSION_TOKEN_KEY, res.token);
     localStorage.setItem(SESSION_USER_KEY, JSON.stringify({ email: res.email, name: res.name, role: res.role }));
+    if (res.reportUrl) localStorage.setItem(SESSION_REPORT_URL_KEY, res.reportUrl);
     state.currentUser = { email: res.email, name: res.name, role: res.role };
     document.getElementById('loginPassword').value = '';
     showAppScreen();
@@ -152,6 +155,7 @@ function logoutUser() {
 function clearSession() {
   localStorage.removeItem(SESSION_TOKEN_KEY);
   localStorage.removeItem(SESSION_USER_KEY);
+  localStorage.removeItem(SESSION_REPORT_URL_KEY);
   state.currentUser = null;
 }
 
@@ -248,6 +252,15 @@ function refreshTransactions(silent) {
 function manualRefresh() {
   showToast('Menyegarkan data...');
   refreshTransactions();
+}
+
+function openReportSpreadsheet() {
+  const url = localStorage.getItem(SESSION_REPORT_URL_KEY);
+  if (!url) {
+    showToast('Link laporan belum tersedia, coba refresh halaman / login ulang', 'error');
+    return;
+  }
+  window.open(url, '_blank');
 }
 
 /* ================= DASHBOARD ================= */

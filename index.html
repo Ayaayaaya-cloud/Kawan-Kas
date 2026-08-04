@@ -20,7 +20,7 @@
 ====================================================================== -->
 <script>
   window.KAWANKAS_CONFIG = {
-    API_URL: 'https://script.google.com/macros/s/AKfycbzSeK8IS8vGaicPJ7_DyZ4aE8z_fegGh2SnTzJLwSpqGg4Sv8lyhDTkAAg9j6LPibM3/exec', // diakhiri /exec
+    API_URL: 'GANTI_DENGAN_URL_WEB_APP_APPS_SCRIPT_ANDA', // diakhiri /exec
   };
 </script>
 
@@ -81,6 +81,10 @@
           Tambah Transaksi
         </button>
       </div>
+      <button class="qa-btn-wide" onclick="openReportSpreadsheet()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>
+        Buka Laporan Spreadsheet
+      </button>
 
       <div class="section-title">Transaksi Terbaru <small onclick="goToScreen('riwayat')" style="cursor:pointer;">Lihat semua ›</small></div>
       <div id="recentTxList"></div>
@@ -223,13 +227,14 @@
 
       <div class="form-card" style="margin-top:14px;">
         <div class="field" style="margin-bottom:8px;">
-          <label>Sinkronisasi Data</label>
+          <label>Sinkronisasi & Laporan</label>
         </div>
+        <button class="btn-secondary" onclick="openReportSpreadsheet()">📊 Buka Laporan Spreadsheet</button>
         <button class="btn-secondary" onclick="manualRefresh()">🔄 Refresh Data dari Spreadsheet</button>
         <p class="settings-note">
           Semua transaksi tersimpan langsung di Google Spreadsheet tim dan bisa diakses dari
-          perangkat manapun oleh user yang terdaftar. Data ikut ter-refresh otomatis setiap
-          beberapa detik saat halaman Dashboard / Riwayat dibuka.
+          perangkat manapun oleh user yang terdaftar. Tab "Ringkasan" di spreadsheet berisi
+          total & rincian per kategori yang terhitung otomatis dari setiap transaksi baru.
         </p>
       </div>
     </section>
