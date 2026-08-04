@@ -1,12 +1,44 @@
 # Kawan Kas - Aplikasi Keuangan Internal (PWA + Google Sheet Real-Time)
 
 Aplikasi pencatatan keuangan internal, multi-device, database Google Spreadsheet
-asli, login email+password sederhana, dan scan struk otomatis (OCR). Semua
-environment gratis: GitHub Pages (hosting), Google Sheets (database),
+asli, login email+password sederhana, laporan otomatis, dan scan struk otomatis
+(OCR). Semua environment gratis: GitHub Pages (hosting), Google Sheets (database),
 Google Apps Script (backend), Google Drive (simpan foto struk).
 
 **Tidak perlu Google Cloud Console / OAuth Client ID sama sekali** — login
 memakai email + password yang Bapak buat & simpan sendiri di spreadsheet.
+
+---
+
+## ✅ SETELAH SETIAP UPDATE KODE DARI CLAUDE — Checklist Baku
+
+Setiap kali kode diupdate, Claude akan bilang file apa saja yang berubah. Cek
+tabel ini untuk tahu tindakan yang diperlukan per jenis file:
+
+| File yang berubah | Yang harus Bapak lakukan |
+|---|---|
+| `Code.gs` | 1) Buka Apps Script editor (Extensions → Apps Script di spreadsheet) → **replace semua isi** dengan `Code.gs` yang baru → Save.<br>2) Jika ada fungsi setup baru (Claude akan bilang), jalankan fungsi tsb sekali dari dropdown Run.<br>3) **Deploy → Manage deployments → klik ✏️ (edit) pada deployment aktif → Version: "New version" → Deploy.** URL `/exec` tetap sama, tidak perlu diganti di `index.html`. |
+| `index.html`, `app.js`, `style.css`, `manifest.json`, `service-worker.js` | Cukup **upload ulang file yang berubah ke GitHub repo** (replace file lama dengan nama sama, di lokasi/root yang sama). Tidak perlu apa-apa di sisi Apps Script. Tunggu 1-2 menit untuk GitHub Pages rebuild. |
+| File config (`API_URL` dsb di `index.html`) | Hanya perlu diisi ulang jika Claude bilang ada field config baru, atau kalau Bapak deploy ulang Apps Script sebagai **deployment baru** (bukan "New version") sehingga URL `/exec` berubah. |
+
+### 🔧 Update kali ini — yang perlu Bapak lakukan sekarang:
+File yang berubah: `Code.gs`, `index.html`, `app.js`, `style.css`.
+
+Fitur baru: tombol "Buka Laporan Spreadsheet" (perbaikan — sebelumnya belum ter-upload),
+halaman **Laporan** langsung di dalam app (ringkasan + breakdown per kategori dengan bar,
+filter Bulan Ini/Semua Waktu), input **jam** transaksi, dan kategori baru **"Jasa"**.
+
+1. Buka Apps Script editor → **replace semua isi dengan `Code.gs` yang baru** di zip ini.
+2. Di dropdown fungsi, pilih **`setupSheets`** → klik Run. Ini akan menambah kolom
+   **"Waktu"** di tab Transaksi (data lama tetap aman, kolom baru cuma kosong untuk
+   transaksi lama) dan me-refresh tab Ringkasan.
+3. **Deploy → Manage deployments → ✏️ Edit → Version: "New version" → Deploy.**
+4. Upload ulang `index.html`, `app.js`, `style.css` ke GitHub repo (replace file lama,
+   pastikan menimpa di root repo yang sama). `API_URL` yang sudah diisi tidak perlu diganti.
+5. Refresh app di HP → akan muncul: tombol laporan di Dashboard & Setelan, menu
+   **"Laporan"** baru di bottom nav, field Jam di form transaksi, dan kategori Jasa.
+
+---
 
 ## 📁 Isi Folder
 
@@ -139,13 +171,24 @@ Semua device baca/tulis ke Spreadsheet yang sama. Data ter-refresh otomatis tiap
 - **Ganti password user**: generate hash baru, replace nilai di kolom PasswordHash
   baris user tsb.
 
-## 📊 Lihat Laporan Langsung dari Spreadsheet
+## 📊 Laporan Otomatis (Tab "Ringkasan")
 
-Karena semua transaksi masuk ke tab **Transaksi** di Google Sheet, Anda bisa langsung:
-- Buat Pivot Table untuk rekap bulanan per kategori
+Setiap kali `setupSheets` dijalankan, sebuah tab **"Ringkasan"** otomatis dibuat/di-refresh
+di spreadsheet, berisi (semua dalam bentuk formula yang otomatis update setiap ada
+transaksi baru — tidak perlu diedit manual):
+- Total Pemasukan, Total Pengeluaran, Saldo Saat Ini
+- Rincian Pengeluaran per Kategori
+- Rincian Pemasukan per Kategori
+- 20 Transaksi Terbaru
+
+Di dalam app, tap tombol **"📊 Buka Laporan Spreadsheet"** (ada di Dashboard dan
+Setelan) — akan langsung membuka tab Ringkasan ini di browser/HP Bapak.
+
+Untuk analisis lebih dalam, Bapak tetap bisa:
+- Buat Pivot Table tambahan dari tab **Transaksi** (data mentah)
 - Pasang chart/grafik bawaan Google Sheets
 - Export ke Excel/PDF kapan saja
-- Hubungkan ke Looker Studio (gratis) untuk dashboard laporan yang lebih visual
+- Hubungkan ke Looker Studio (gratis) untuk dashboard yang lebih visual
 
 ## ⚠️ Catatan Keamanan & Batasan
 

@@ -81,6 +81,10 @@ function todayISO() {
   const d = new Date();
   return d.toISOString().slice(0, 10);
 }
+function nowTimeHM() {
+  const d = new Date();
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
 function formatDateDisplay(iso) {
   if (!iso) return '-';
   const d = new Date(iso + 'T00:00:00');
@@ -191,7 +195,7 @@ function renderCurrentUserInfo() {
 function startPolling() {
   stopPolling();
   pollTimer = setInterval(() => {
-    if (state.currentScreen === 'dashboard' || state.currentScreen === 'riwayat') {
+    if (state.currentScreen === 'dashboard' || state.currentScreen === 'riwayat' || state.currentScreen === 'laporan') {
       refreshTransactions(true);
     }
   }, POLL_INTERVAL_MS);
@@ -216,8 +220,10 @@ function goToScreen(name) {
 
   if (name === 'dashboard') renderDashboard();
   if (name === 'riwayat') renderRiwayat();
+  if (name === 'laporan') renderLaporan();
   if (name === 'input') {
     document.getElementById('inputTanggal').value = todayISO();
+    document.getElementById('inputWaktu').value = nowTimeHM();
   }
   if (name === 'settings') {
     renderCurrentUserInfo();
@@ -242,6 +248,7 @@ function refreshTransactions(silent) {
       setCachedTransactions(res.transactions);
       if (state.currentScreen === 'dashboard') renderDashboard();
       if (state.currentScreen === 'riwayat') renderRiwayat();
+      if (state.currentScreen === 'laporan') renderLaporan();
     } else if (!silent) {
       showToast(res.error || 'Gagal memuat data terbaru, menampilkan cache lokal', 'error');
     }
@@ -261,6 +268,61 @@ function openReportSpreadsheet() {
     return;
   }
   window.open(url, '_blank');
+}
+
+/* ================= LAPORAN (in-app) ================= */
+let laporanPeriod = 'bulan';
+
+function setLaporanPeriod(p) {
+  laporanPeriod = p;
+  document.querySelectorAll('#screen-laporan .filter-chip').forEach((c) => c.classList.toggle('active', c.dataset.period === p));
+  renderLaporan();
+}
+
+function renderLaporan() {
+  let list = getCachedTransactions();
+
+  if (laporanPeriod === 'bulan') {
+    const ym = todayISO().slice(0, 7); // yyyy-mm
+    list = list.filter((tx) => (tx.date || '').startsWith(ym));
+  }
+
+  const totalIn = list.filter((t) => t.type === 'masuk').reduce((a, t) => a + Number(t.amount), 0);
+  const totalOut = list.filter((t) => t.type === 'keluar').reduce((a, t) => a + Number(t.amount), 0);
+
+  document.getElementById('laporanTotalIn').textContent = formatRupiah(totalIn);
+  document.getElementById('laporanTotalOut').textContent = formatRupiah(totalOut);
+  document.getElementById('laporanSaldo').textContent = formatRupiah(totalIn - totalOut);
+
+  renderKategoriBreakdown(list.filter((t) => t.type === 'keluar'), totalOut, 'laporanKategoriKeluar', 'out');
+  renderKategoriBreakdown(list.filter((t) => t.type === 'masuk'), totalIn, 'laporanKategoriMasuk', 'in');
+}
+
+function renderKategoriBreakdown(list, total, containerId, cls) {
+  const container = document.getElementById(containerId);
+  if (!list.length) {
+    container.innerHTML = emptyState('Belum ada data pada periode ini.');
+    return;
+  }
+  const map = {};
+  list.forEach((tx) => {
+    const cat = tx.category || 'Lainnya';
+    map[cat] = (map[cat] || 0) + Number(tx.amount);
+  });
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+
+  container.innerHTML = entries.map(([cat, amt]) => {
+    const pct = total > 0 ? Math.round((amt / total) * 100) : 0;
+    return `
+      <div class="report-cat-item">
+        <div class="report-cat-top">
+          <span class="name">${escapeHtml(cat)}</span>
+          <span class="amount">${formatRupiah(amt)}</span>
+        </div>
+        <div class="report-cat-bar-track"><div class="report-cat-bar-fill ${cls}" style="width:${pct}%;"></div></div>
+        <div class="report-cat-percent">${pct}% dari total</div>
+      </div>`;
+  }).join('');
 }
 
 /* ================= DASHBOARD ================= */
@@ -298,7 +360,7 @@ function renderTxItem(tx) {
       <div class="tx-icon ${isIn ? 'in' : 'out'}">${isIn ? '↓' : '↑'}</div>
       <div class="tx-info">
         <div class="tx-desc">${escapeHtml(tx.description || tx.category)}</div>
-        <div class="tx-meta">${formatDateDisplay(tx.date)} • ${escapeHtml(tx.category)}</div>
+        <div class="tx-meta">${formatDateDisplay(tx.date)}${tx.time ? ' • ' + escapeHtml(tx.time) : ''} • ${escapeHtml(tx.category)}</div>
         ${receiptLink} ${createdBy}
       </div>
       <div class="tx-amount ${isIn ? 'in' : 'out'}">${isIn ? '+' : '-'}${formatRupiah(tx.amount)}</div>
@@ -346,6 +408,7 @@ function submitManualTransaction() {
 
   const tx = {
     date: tanggal,
+    time: document.getElementById('inputWaktu').value || nowTimeHM(),
     type: state.manualType,
     amount: Number(nominal),
     category: kategori,
@@ -410,6 +473,7 @@ function handleReceiptFile(e) {
     document.getElementById('scanResultArea').style.display = 'block';
     document.getElementById('receiptPreviewImg').src = currentReceiptDataUrl;
     document.getElementById('scanTanggal').value = todayISO();
+    document.getElementById('scanWaktu').value = nowTimeHM();
     document.getElementById('scanNominal').value = '';
     document.getElementById('scanDeskripsi').value = '';
     document.getElementById('scanRawText').value = '';
@@ -538,6 +602,7 @@ function submitScanTransaction() {
 
   const tx = {
     date: tanggal,
+    time: document.getElementById('scanWaktu').value || nowTimeHM(),
     type: state.scanType,
     amount: Number(nominal),
     category: kategori,

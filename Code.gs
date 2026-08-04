@@ -57,8 +57,8 @@
  * ============================================================================
  */
 
-const SPREADSHEET_ID = 'GANTI_DENGAN_ID_SPREADSHEET_ANDA';
-const DRIVE_FOLDER_ID = 'GANTI_DENGAN_ID_FOLDER_DRIVE_ANDA';
+const SPREADSHEET_ID = '1AI71JaZ-IRrql5avotFGmjWMO8Yt7EEDtSpSiOz6miA';
+const DRIVE_FOLDER_ID = '1areI02cZp1IYaJ8NXIlna3YFi7i4pVRE';
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // sesi login berlaku 7 hari
 const PASSWORD_SALT = 'kawankas-salt-ganti-jika-mau-2026'; // opsional diganti, bukan wajib
 
@@ -69,7 +69,71 @@ function setupSheets() {
   getSheet('Users');
   getSheet('Transaksi');
   getSheet('Sessions');
+  ensureTransaksiWaktuColumn();
+  ensureRingkasanSheet();
   Logger.log('Setup selesai. Buka ulang spreadsheet, lalu isi tab "Users".');
+}
+
+/* Migrasi: tambah kolom "Waktu" di tab Transaksi jika belum ada (aman dijalankan berkali-kali) */
+function ensureTransaksiWaktuColumn() {
+  const sheet = getSheet('Transaksi');
+  const header = sheet.getRange(1, 1, 1, 10).getValues()[0];
+  if (header[9] !== 'Waktu') {
+    sheet.getRange(1, 10).setValue('Waktu').setFontWeight('bold');
+  }
+}
+
+/* ============================================================
+   TAB "RINGKASAN" — laporan otomatis (formula, bukan data mentah)
+   Dibuat/di-refresh ulang setiap setupSheets() dijalankan.
+   ============================================================ */
+function ensureRingkasanSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Ringkasan');
+  if (!sheet) {
+    sheet = ss.insertSheet('Ringkasan', 0);
+  }
+  sheet.clear();
+
+  sheet.getRange('A1').setValue('LAPORAN KEUANGAN - KAWAN KAS').setFontWeight('bold').setFontSize(14);
+  sheet.getRange('A2').setValue('Sheet ini otomatis terhitung dari tab Transaksi. Jangan edit manual — perubahan akan hilang saat setupSheets() dijalankan ulang.');
+  sheet.getRange('A2:E2').merge();
+  sheet.getRange('A2').setFontStyle('italic').setFontColor('#888888').setWrap(true);
+
+  sheet.getRange('A4').setValue('Total Pemasukan');
+  sheet.getRange('B4').setFormula('=SUMIF(Transaksi!D:D,"masuk",Transaksi!E:E)');
+  sheet.getRange('A5').setValue('Total Pengeluaran');
+  sheet.getRange('B5').setFormula('=SUMIF(Transaksi!D:D,"keluar",Transaksi!E:E)');
+  sheet.getRange('A6').setValue('Saldo Saat Ini');
+  sheet.getRange('B6').setFormula('=B4-B5');
+  sheet.getRange('A4:A6').setFontWeight('bold');
+  sheet.getRange('B4:B6').setNumberFormat('Rp #,##0');
+
+  sheet.getRange('A8').setValue('RINCIAN PENGELUARAN PER KATEGORI').setFontWeight('bold');
+  sheet.getRange('A9').setFormula(
+    "=IFERROR(QUERY(Transaksi!A:I,\"select F, sum(E) where D='keluar' group by F label sum(E) 'Total Pengeluaran' order by sum(E) desc\",1),\"Belum ada data pengeluaran\")"
+  );
+
+  sheet.getRange('D8').setValue('RINCIAN PEMASUKAN PER KATEGORI').setFontWeight('bold');
+  sheet.getRange('D9').setFormula(
+    "=IFERROR(QUERY(Transaksi!A:I,\"select F, sum(E) where D='masuk' group by F label sum(E) 'Total Pemasukan' order by sum(E) desc\",1),\"Belum ada data pemasukan\")"
+  );
+
+  sheet.getRange('A20').setValue('20 TRANSAKSI TERBARU').setFontWeight('bold');
+  sheet.getRange('A21').setFormula(
+    '=IFERROR(SORT(QUERY(Transaksi!A:I,"select C, D, E, F, G, I where C is not null",0),1,FALSE),"Belum ada transaksi")'
+  );
+
+  sheet.autoResizeColumns(1, 9);
+  ss.setActiveSheet(sheet);
+  try { ss.moveActiveSheet(1); } catch (e) { /* abaikan jika gagal, tidak fatal */ }
+}
+
+function getReportUrl() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Ringkasan');
+  const base = ss.getUrl();
+  return sheet ? (base + '#gid=' + sheet.getSheetId()) : base;
 }
 
 /* ============================================================
@@ -173,7 +237,7 @@ function handleLogin(email, password) {
   }
 
   const token = createSession(userRecord.email, userRecord.nama);
-  return { success: true, token: token, email: userRecord.email, name: userRecord.nama, role: userRecord.role };
+  return { success: true, token: token, email: userRecord.email, name: userRecord.nama, role: userRecord.role, reportUrl: getReportUrl() };
 }
 
 function findUserByEmail(email) {
@@ -207,7 +271,7 @@ function createSession(email, name) {
 function handleVerifySession(token) {
   const user = getSessionUser(token);
   if (!user) return { success: false, error: 'Sesi tidak valid, silakan login ulang' };
-  return { success: true, email: user.email, name: user.name };
+  return { success: true, email: user.email, name: user.name, reportUrl: getReportUrl() };
 }
 
 function getSessionUser(token) {
@@ -261,6 +325,7 @@ function getTransactionsList() {
       description: data[i][6],
       receiptLink: data[i][7] || '',
       createdBy: data[i][8] || '',
+      time: data[i][9] || '',
     });
   }
   rows.reverse(); // transaksi terbaru tampil duluan
@@ -291,6 +356,7 @@ function addTransactionRow(tx, user) {
     tx.description || '',
     tx.receiptLink || '',
     user.name + ' (' + user.email + ')',
+    tx.time || '',
   ]);
   return { success: true, id: id };
 }
@@ -321,8 +387,8 @@ function getSheet(name) {
       sheet.getRange('A1:E1').setFontWeight('bold');
     }
     if (name === 'Transaksi') {
-      sheet.appendRow(['ID', 'Timestamp', 'Tanggal', 'Jenis', 'Nominal', 'Kategori', 'Deskripsi', 'ReceiptLink', 'DibuatOleh']);
-      sheet.getRange('A1:I1').setFontWeight('bold');
+      sheet.appendRow(['ID', 'Timestamp', 'Tanggal', 'Jenis', 'Nominal', 'Kategori', 'Deskripsi', 'ReceiptLink', 'DibuatOleh', 'Waktu']);
+      sheet.getRange('A1:J1').setFontWeight('bold');
     }
     if (name === 'Sessions') {
       sheet.appendRow(['Token', 'Email', 'Nama', 'DibuatPada', 'Kadaluarsa']);

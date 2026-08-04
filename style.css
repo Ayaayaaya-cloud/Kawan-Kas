@@ -156,6 +156,28 @@ html, body {
 }
 .qa-btn-wide svg { width: 18px; height: 18px; }
 
+/* ===== LAPORAN - breakdown kategori ===== */
+.report-cat-item {
+  background: var(--cream-50);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  margin-bottom: 9px;
+  box-shadow: var(--shadow-card);
+}
+.report-cat-top {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.83rem; margin-bottom: 7px; gap: 8px;
+}
+.report-cat-top .name { font-weight: 700; color: var(--ink-900); }
+.report-cat-top .amount { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-cat-bar-track {
+  height: 7px; background: #EFE9D8; border-radius: 999px; overflow: hidden;
+}
+.report-cat-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+.report-cat-bar-fill.out { background: var(--red-500); }
+.report-cat-bar-fill.in { background: var(--green-600); }
+.report-cat-percent { font-size: 0.7rem; color: var(--ink-500); margin-top: 5px; }
+
 /* Transaction list */
 .tx-item {
   display: flex;
@@ -206,9 +228,10 @@ html, body {
 .nav-btn {
   background: none; border: none; display: flex; flex-direction: column;
   align-items: center; gap: 3px; color: var(--ink-500);
-  font-size: 0.65rem; font-weight: 600; padding: 6px 10px; cursor: pointer;
+  font-size: 0.62rem; font-weight: 600; padding: 6px 4px; cursor: pointer;
+  flex: 1; min-width: 0;
 }
-.nav-btn svg { width: 22px; height: 22px; }
+.nav-btn svg { width: 20px; height: 20px; }
 .nav-btn.active { color: var(--emerald-800); }
 .nav-btn.scan-fab {
   background: linear-gradient(135deg, var(--emerald-900), var(--emerald-950));
