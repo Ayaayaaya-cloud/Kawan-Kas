@@ -1,4 +1,11 @@
-const CACHE_NAME = 'kawan-kas-v1';
+/**
+ * Kawan Kas - Service Worker
+ * Strategi: NETWORK-FIRST untuk file aplikasi sendiri, supaya setiap kali
+ * ada update yang diupload ke GitHub, versi terbaru langsung terpakai
+ * (bukan versi lama yang nyangkut di cache). Cache tetap dipakai sebagai
+ * fallback saat offline saja.
+ */
+const CACHE_NAME = 'kawan-kas-v2'; // GANTI angka ini (v3, v4, dst) setiap kali mau memaksa refresh cache semua user
 const ASSETS = [
   './index.html',
   './style.css',
@@ -27,26 +34,22 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // Jangan cache request ke CDN Tesseract atau Google Apps Script (wajib online)
-  if (
-    url.includes('cdnjs.cloudflare.com') ||
-    url.includes('script.google.com') ||
-    url.includes('unpkg.com')
-  ) {
+  // CDN eksternal & Google Apps Script: langsung ke network, fallback cache kalau offline
+  if (url.includes('cdnjs.cloudflare.com') || url.includes('script.google.com') || url.includes('unpkg.com')) {
     event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
     return;
   }
 
+  // File aplikasi sendiri: NETWORK-FIRST (selalu coba versi terbaru dulu)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request).then((response) => {
-        // simpan salinan baru ke cache untuk aset lokal
+    fetch(event.request)
+      .then((response) => {
         if (event.request.method === 'GET' && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => cached);
-    })
+      })
+      .catch(() => caches.match(event.request)) // offline -> pakai cache terakhir yang berhasil disimpan
   );
 });
